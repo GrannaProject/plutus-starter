@@ -26,16 +26,26 @@ import qualified Plutus.PAB.Effects.Contract.Builtin as Builtin
 import           Plutus.PAB.Simulator                (SimulatorEffectHandlers)
 import qualified Plutus.PAB.Simulator                as Simulator
 import qualified Plutus.PAB.Webserver.Server         as PAB.Server
-import           Plutus.Contracts.Game               as Game
+-- import           Plutus.Contracts.Game               as Game
 import           Plutus.Trace.Emulator.Extract       (writeScriptsTo, ScriptsConfig (..), Command (..))
+import           Wallet.Types                        (ContractInstanceId (..))
 import           Ledger.Index                        (ValidatorMode(..))
+
+import Granna.Contract as Granna
 
 main :: IO ()
 main = void $ Simulator.runSimulationWith handlers $ do
     Simulator.logString @(Builtin StarterContracts) "Starting plutus-starter PAB webserver on port 8080. Press enter to exit."
     shutdown <- PAB.Server.startServerDebug
-    -- Example of spinning up a game instance on startup
-    -- void $ Simulator.activateContract (Wallet 1) GameContract
+    -- Example of spinning up a Granna instance on startup
+    -- (w1, pkh1) <- Simulator.addWallet
+    -- (w2, pkh2) <- Simulator.addWallet
+    -- instanceId1 <- Simulator.activateContract w1 GrannaContract
+    -- instanceId2 <- Simulator.activateContract w2 GrannaContract
+
+    -- Simulator.logString @(Builtin StarterContracts) $ "Contract instance 1:" ++ show instanceId1
+    -- Simulator.logString @(Builtin StarterContracts) $ "Contract instance 2:" ++ show instanceId2
+
     -- You can add simulator actions here:
     -- Simulator.observableState
     -- etc.
@@ -58,14 +68,14 @@ writeCostingScripts = do
   let config = ScriptsConfig { scPath = "/tmp/plutus-costing-outputs/", scCommand = cmd }
       cmd    = Scripts { unappliedValidators = FullyAppliedValidators }
       -- Note: Here you can use any trace you wish.
-      trace  = correctGuessTrace
-  (totalSize, exBudget) <- writeScriptsTo config "game" trace def
+      trace  = submitTrace
+  (totalSize, exBudget) <- writeScriptsTo config "granna" trace def
   putStrLn $ "Total size = " <> show totalSize
   putStrLn $ "ExBudget = " <> show exBudget
 
 
 data StarterContracts =
-    GameContract
+    GrannaContract
     deriving (Eq, Ord, Show, Generic)
     deriving anyclass OpenApi.ToSchema
 
@@ -87,15 +97,13 @@ instance Pretty StarterContracts where
     pretty = viaShow
 
 instance Builtin.HasDefinitions StarterContracts where
-    getDefinitions = [GameContract]
+    getDefinitions = [GrannaContract]
     getSchema =  \case
-        GameContract -> Builtin.endpointsToSchemas @Game.GameSchema
+        GrannaContract -> Builtin.endpointsToSchemas @Granna.GrannaSchema
     getContract = \case
-        GameContract -> SomeBuiltin (Game.game @ContractError)
+        GrannaContract -> SomeBuiltin Granna.endpoints
 
 handlers :: SimulatorEffectHandlers (Builtin StarterContracts)
 handlers =
     Simulator.mkSimulatorHandlers def def
     $ interpret (contractHandler Builtin.handleBuiltin)
-
-
